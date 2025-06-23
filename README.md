@@ -1,15 +1,15 @@
 === WooCommerce AI Product Title Translator ===
-Contributors: MK-Chan-MECACA
-Donate link: coff.ee/mkchan
-Tags: woocommerce, translation, ai, product titles, bahasa malaysia, openai, claude, gemini
-Requires at least: 5.0
-Tested up to: 6.6
-Requires PHP: 7.4
-Stable tag: 1.0.0
-License: GPLv2 or later
-License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Translate WooCommerce product titles to Bahasa Malaysia using AI providers like OpenAI, Claude, Gemini, and Mesolitica.
+Contributors: MK-Chan-MECACA<br>
+Donate link: coff.ee/mkchan<br>
+Tags: woocommerce, translation, ai, product titles, bahasa malaysia, openai, claude, gemini<br>
+Requires at least: 5.0<br>
+Tested up to: 6.6<br>
+Requires PHP: 7.4<br>
+Stable tag: 1.0.0<br>
+License: GPLv2 or later<br>
+License URI: https://www.gnu.org/licenses/gpl-2.0.html<br>
+Translate WooCommerce product titles to Bahasa Malaysia using AI providers like OpenAI, Claude, Gemini, and Mesolitica.<br>
 
 == Description ==
 
