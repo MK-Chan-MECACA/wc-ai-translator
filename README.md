@@ -13,7 +13,7 @@ Translate WooCommerce product titles to Bahasa Malaysia using AI providers like 
 
 == Description ==
 
-WooCommerce AI Product Title Translator is a powerful plugin that automatically translates your WooCommerce product titles to Bahasa Malaysia using advanced AI translation services. Perfect for Malaysian e-commerce stores looking to localize their product catalogs.
+AI Product Title Translator – Bahasa Malaysia is a powerful plugin that automatically translates your WooCommerce product titles to Bahasa Malaysia using advanced AI translation services. Perfect for Malaysian e-commerce stores looking to localize their product catalogs.
 
 = Key Features =
 
