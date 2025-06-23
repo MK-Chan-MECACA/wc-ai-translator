@@ -4,7 +4,7 @@
  * Plugin URI: https://github.com/MK-Chan-MECACA/wc-ai-translator
  * Description: Translate WooCommerce product titles to Bahasa Malaysia using AI (OpenAI, Claude, Gemini)
  * Version: 1.0.1
- * Author: mk-chan
+ * Author: MK CHAN
  * License: GPL v2 or later
  * Text Domain: wc-ai-translator
  */
