@@ -534,120 +534,7 @@ class WC_AI_Translator {
                     )
                 ),
                 'temperature' => 0.3,
-                'max_tokens' => 100
-            )),
-            'timeout' => 30
-        ));
-        
-        if (is_wp_error($response)) {
-            return false;
-        }
-        
-        $body = json_decode(wp_remote_retrieve_body($response), true);
-        return isset($body['choices'][0]['message']['content']) ? trim($body['choices'][0]['message']['content']) : false;
-    }
-    
-    private function translate_with_claude($prompt, $api_key) {
-        $response = wp_remote_post('https://api.anthropic.com/v1/messages', array(
-            'headers' => array(
-                'x-api-key' => $api_key,
-                'anthropic-version' => '2023-06-01',
-                'Content-Type' => 'application/json',
-            ),
-            'body' => json_encode(array(
-                'model' => 'claude-3-haiku-20240307',
-                'messages' => array(
-                    array(
-                        'role' => 'user',
-                        'content' => $prompt
-                    )
-                ),
-                'max_tokens' => 100
-            )),
-            'timeout' => 30
-        ));
-        
-        if (is_wp_error($response)) {
-            return false;
-        }
-        
-        $body = json_decode(wp_remote_retrieve_body($response), true);
-        return isset($body['content'][0]['text']) ? trim($body['content'][0]['text']) : false;
-    }
-    
-    private function translate_with_gemini($prompt, $api_key) {
-        $response = wp_remote_post('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=' . $api_key, array(
-            'headers' => array(
-                'Content-Type' => 'application/json',
-            ),
-            'body' => json_encode(array(
-                'contents' => array(
-                    array(
-                        'parts' => array(
-                            array(
-                                'text' => $prompt
-                            )
-                        )
-                    )
-                )
-            )),
-            'timeout' => 30
-        ));
-        
-        if (is_wp_error($response)) {
-            return false;
-        }
-        
-        $body = json_decode(wp_remote_retrieve_body($response), true);
-        return isset($body['candidates'][0]['content']['parts'][0]['text']) ? trim($body['candidates'][0]['content']['parts'][0]['text']) : false;
-    }
-    
-    private function translate_with_mesolitica($text, $api_key) {
-        $response = wp_remote_post('https://api.mesolitica.com/translation', array(
-            'headers' => array(
-                'accept' => 'application/json',
-                'Authorization' => 'Bearer ' . $api_key,
-                'Content-Type' => 'application/json',
-            ),
-            'body' => json_encode(array(
-                'input' => $text,
-                'to_lang' => 'ms',
-                'model' => 'base',
-                'temperature' => 0,
-                'top_p' => 1,
-                'top_k' => 1,
-                'repetition_penalty' => 1.1
-            )),
-            'timeout' => 30
-        ));
-        
-        if (is_wp_error($response)) {
-            return false;
-        }
-        
-        $body = json_decode(wp_remote_retrieve_body($response), true);
-        
-        // Mesolitica returns the translation in 'result' field
-        return isset($body['result']) ? trim($body['result']) : false;
-    }
-}
-
-// Initialize the plugin
-add_action('plugins_loaded', function() {
-    if (class_exists('WooCommerce')) {
-        WC_AI_Translator::get_instance();
-    }
-});
-
-// Create assets folder structure on activation
-register_activation_hook(__FILE__, function() {
-    $upload_dir = wp_upload_dir();
-    $plugin_dir = $upload_dir['basedir'] . '/wc-ai-translator';
-    
-    if (!file_exists($plugin_dir)) {
-        wp_mkdir_p($plugin_dir);
-    }
-});tokens' => 50
+                'max_tokens' => 50
             )),
             'timeout' => 15
         ));
@@ -795,21 +682,129 @@ register_activation_hook(__FILE__, function() {
             default:
                 return false;
         }
+        private function translate_with_openai($prompt, $api_key) {
+    $response = wp_remote_post('https://api.openai.com/v1/chat/completions', array(
+        'headers' => array(
+            'Authorization' => 'Bearer ' . $api_key,
+            'Content-Type' => 'application/json',
+        ),
+        'body' => json_encode(array(
+            'model' => 'gpt-4o-mini',
+            'messages' => array(
+                array(
+                    'role' => 'user',
+                    'content' => $prompt
+                )
+            ),
+            'temperature' => 0.3,
+            'max_tokens' => 100
+        )),
+        'timeout' => 30
+    ));
+    
+    if (is_wp_error($response)) {
+        return false;
     }
     
-    private function translate_with_openai($prompt, $api_key) {
-        $response = wp_remote_post('https://api.openai.com/v1/chat/completions', array(
-            'headers' => array(
-                'Authorization' => 'Bearer ' . $api_key,
-                'Content-Type' => 'application/json',
+    $body = json_decode(wp_remote_retrieve_body($response), true);
+    return isset($body['choices'][0]['message']['content']) ? trim($body['choices'][0]['message']['content']) : false;
+}
+
+private function translate_with_claude($prompt, $api_key) {
+    $response = wp_remote_post('https://api.anthropic.com/v1/messages', array(
+        'headers' => array(
+            'x-api-key' => $api_key,
+            'anthropic-version' => '2023-06-01',
+            'Content-Type' => 'application/json',
+        ),
+        'body' => json_encode(array(
+            'model' => 'claude-3-haiku-20240307',
+            'messages' => array(
+                array(
+                    'role' => 'user',
+                    'content' => $prompt
+                )
             ),
-            'body' => json_encode(array(
-                'model' => 'gpt-4o-mini',
-                'messages' => array(
-                    array(
-                        'role' => 'user',
-                        'content' => $prompt
+            'max_tokens' => 100
+        )),
+        'timeout' => 30
+    ));
+    
+    if (is_wp_error($response)) {
+        return false;
+    }
+    
+    $body = json_decode(wp_remote_retrieve_body($response), true);
+    return isset($body['content'][0]['text']) ? trim($body['content'][0]['text']) : false;
+}
+
+private function translate_with_gemini($prompt, $api_key) {
+    $response = wp_remote_post('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=' . $api_key, array(
+        'headers' => array(
+            'Content-Type' => 'application/json',
+        ),
+        'body' => json_encode(array(
+            'contents' => array(
+                array(
+                    'parts' => array(
+                        array(
+                            'text' => $prompt
+                        )
                     )
-                ),
-                'temperature' => 0.3,
-                'max_
+                )
+            )
+        )),
+        'timeout' => 30
+    ));
+    
+    if (is_wp_error($response)) {
+        return false;
+    }
+    
+    $body = json_decode(wp_remote_retrieve_body($response), true);
+    return isset($body['candidates'][0]['content']['parts'][0]['text']) ? trim($body['candidates'][0]['content']['parts'][0]['text']) : false;
+}
+
+private function translate_with_mesolitica($text, $api_key) {
+    $response = wp_remote_post('https://api.mesolitica.com/translation', array(
+        'headers' => array(
+            'accept' => 'application/json',
+            'Authorization' => 'Bearer ' . $api_key,
+            'Content-Type' => 'application/json',
+        ),
+        'body' => json_encode(array(
+            'input' => $text,
+            'to_lang' => 'ms',
+            'model' => 'base',
+            'temperature' => 0,
+            'top_p' => 1,
+            'top_k' => 1,
+            'repetition_penalty' => 1.1
+        )),
+        'timeout' => 30
+    ));
+    
+    if (is_wp_error($response)) {
+        return false;
+    }
+    
+    $body = json_decode(wp_remote_retrieve_body($response), true);
+    
+    // Mesolitica returns the translation in 'result' field
+    return isset($body['result']) ? trim($body['result']) : false;
+}
+}
+// Initialize the plugin
+add_action('plugins_loaded', function() {
+if (class_exists('WooCommerce')) {
+WC_AI_Translator::get_instance();
+}
+});
+// Create assets folder structure on activation
+register_activation_hook(FILE, function() {
+$upload_dir = wp_upload_dir();
+$plugin_dir = $upload_dir['basedir'] . '/wc-ai-translator';
+if (!file_exists($plugin_dir)) {
+    wp_mkdir_p($plugin_dir);
+}
+});
