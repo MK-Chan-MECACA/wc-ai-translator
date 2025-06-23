@@ -1,0 +1,82 @@
+/* WooCommerce AI Product Title Translator Styles */
+
+/* Product edit page translate button group */
+.wcait-translate-group {
+    border-top: 1px solid #eee;
+    padding-top: 10px;
+    margin-top: 10px;
+}
+
+.wcait-translate-btn {
+    margin-right: 10px;
+}
+
+.wcait-status {
+    display: inline-block;
+    margin-left: 10px;
+    font-style: italic;
+}
+
+/* Settings page styles */
+.wcait-instructions {
+    margin-top: 30px;
+    background: #f1f1f1;
+    padding: 20px;
+    border-radius: 5px;
+    border-left: 4px solid #0073aa;
+}
+
+.wcait-instructions h2 {
+    margin-top: 0;
+    color: #23282d;
+}
+
+.wcait-instructions ol {
+    margin-left: 20px;
+}
+
+.wcait-instructions li {
+    margin-bottom: 8px;
+    line-height: 1.6;
+}
+
+/* Product list translate button */
+.wcait-translate-single {
+    white-space: nowrap;
+}
+
+.wcait-translate-single:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Model info display */
+#model-info {
+    margin-top: 5px;
+    padding: 5px 10px;
+    background: #fff;
+    border-left: 3px solid #0073aa;
+    display: inline-block;
+}
+
+#model-info strong {
+    color: #0073aa;
+}
+
+/* Responsive adjustments */
+@media screen and (max-width: 782px) {
+    .wcait-translate-group {
+        padding: 10px;
+    }
+    
+    .wcait-translate-btn {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+    
+    .wcait-status {
+        display: block;
+        margin-left: 0;
+        margin-top: 10px;
+    }
+}
