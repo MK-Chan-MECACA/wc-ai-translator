@@ -63,6 +63,122 @@
     color: #0073aa;
 }
 
+/* Bulk translate progress modal enhancements */
+#wcait-bulk-progress {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    line-height: 1.4;
+}
+
+#wcait-bulk-progress h3 {
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.wcait-progress-bar {
+    position: relative;
+    overflow: hidden;
+}
+
+.wcait-progress-fill {
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Progress animation keyframes */
+@keyframes wcait-shine {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+.wcait-progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    animation: wcait-shine 2s infinite;
+}
+
+/* Status counters styling */
+.wcait-stats-container {
+    display: flex;
+    justify-content: space-between;
+    margin: 15px 0;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e1e1e1;
+}
+
+.wcait-stat-item {
+    text-align: center;
+    flex: 1;
+}
+
+.wcait-stat-number {
+    font-size: 24px;
+    font-weight: bold;
+    line-height: 1;
+}
+
+.wcait-stat-label {
+    font-size: 11px;
+    color: #646970;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 4px;
+}
+
+/* Cancel button styling */
+.wcait-cancel-bulk {
+    transition: all 0.3s ease;
+    border-radius: 6px;
+}
+
+.wcait-cancel-bulk:hover:not(:disabled) {
+    background: #f0f0f0;
+    border-color: #999;
+}
+
+.wcait-cancel-bulk:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Progress text styling */
+.wcait-progress-text {
+    font-size: 14px;
+    color: #1d2327;
+    text-align: center;
+    margin: 15px 0 !important;
+    min-height: 20px;
+}
+
+/* Overlay styling */
+#wcait-bulk-overlay {
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+}
+
+/* Success/Error styling */
+.wcait-success {
+    color: #00a32a;
+}
+
+.wcait-error {
+    color: #d63638;
+}
+
+.wcait-warning {
+    color: #f56500;
+}
+
 /* Responsive adjustments */
 @media screen and (max-width: 782px) {
     .wcait-translate-group {
@@ -78,5 +194,82 @@
         display: block;
         margin-left: 0;
         margin-top: 10px;
+    }
+    
+    #wcait-bulk-progress {
+        min-width: 90%;
+        max-width: 95%;
+        padding: 20px;
+        margin: 0 auto;
+    }
+    
+    .wcait-stats-container {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .wcait-stat-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 5px 0;
+    }
+    
+    .wcait-stat-number {
+        font-size: 20px;
+    }
+    
+    .wcait-stat-label {
+        font-size: 12px;
+        margin-top: 0;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    #wcait-bulk-progress {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        transform: none;
+        min-width: auto;
+        max-width: none;
+    }
+}
+
+/* Admin notice enhancements */
+.notice.wcait-bulk-notice {
+    border-left-width: 4px;
+    padding: 12px;
+}
+
+.notice.wcait-bulk-notice p {
+    margin: 0.5em 0;
+    font-size: 14px;
+}
+
+/* Loading states */
+.wcait-loading {
+    position: relative;
+    overflow: hidden;
+}
+
+.wcait-loading::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    animation: wcait-loading-sweep 1.5s infinite;
+}
+
+@keyframes wcait-loading-sweep {
+    0% {
+        left: -100%;
+    }
+    100% {
+        left: 100%;
     }
 }
