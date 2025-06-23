@@ -3,7 +3,7 @@
  * Plugin Name: WooCommerce AI Product Title Translator
  * Plugin URI: https://yourwebsite.com/
  * Description: Translate WooCommerce product titles to Bahasa Malaysia using AI (OpenAI, Claude, Gemini)
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Your Name
  * License: GPL v2 or later
  * Text Domain: wc-ai-translator
@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('WCAIT_VERSION', '1.0.0');
+define('WCAIT_VERSION', '1.0.1');
 define('WCAIT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('WCAIT_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -51,6 +51,9 @@ class WC_AI_Translator {
         // Add translate button column to product list
         add_filter('manage_product_posts_columns', array($this, 'add_translate_column'));
         add_action('manage_product_posts_custom_column', array($this, 'render_translate_column'), 10, 2);
+        
+        // Admin notices for bulk translate results
+        add_action('admin_notices', array($this, 'show_bulk_translate_notices'));
     }
     
     public function init() {
@@ -86,7 +89,11 @@ class WC_AI_Translator {
                 'nonce' => wp_create_nonce('wcait_nonce'),
                 'translating' => __('Translating...', 'wc-ai-translator'),
                 'translate' => __('Translate to BM', 'wc-ai-translator'),
-                'error' => __('Translation failed', 'wc-ai-translator')
+                'error' => __('Translation failed', 'wc-ai-translator'),
+                'bulk_confirm' => __('Are you sure you want to translate the selected products? This action cannot be undone.', 'wc-ai-translator'),
+                'processing' => __('Processing translations...', 'wc-ai-translator'),
+                'completed' => __('Translation completed!', 'wc-ai-translator'),
+                'cancelled' => __('Translation cancelled!', 'wc-ai-translator')
             ));
             
             wp_enqueue_style(
@@ -277,15 +284,89 @@ class WC_AI_Translator {
             return $redirect_to;
         }
         
-        // Store post IDs in transient for AJAX processing
-        set_transient('wcait_bulk_translate_ids_' . get_current_user_id(), $post_ids, 3600);
+        // Validate that we have product IDs
+        if (empty($post_ids) || !is_array($post_ids)) {
+            $redirect_to = add_query_arg('wcait_bulk_error', 'no_products', $redirect_to);
+            return $redirect_to;
+        }
         
+        // Filter out non-product posts and validate
+        $product_ids = array();
+        foreach ($post_ids as $post_id) {
+            $post = get_post($post_id);
+            if ($post && $post->post_type === 'product') {
+                $product_ids[] = intval($post_id);
+            }
+        }
+        
+        if (empty($product_ids)) {
+            $redirect_to = add_query_arg('wcait_bulk_error', 'no_valid_products', $redirect_to);
+            return $redirect_to;
+        }
+        
+        // Check if API is configured
+        $api_key = get_option('wcait_api_key', '');
+        if (empty($api_key)) {
+            $redirect_to = add_query_arg('wcait_bulk_error', 'no_api_key', $redirect_to);
+            return $redirect_to;
+        }
+        
+        // Store product IDs in session for AJAX processing
+        if (!session_id()) {
+            session_start();
+        }
+        $_SESSION['wcait_bulk_product_ids'] = $product_ids;
+        
+        // Add flag to trigger bulk processing
         $redirect_to = add_query_arg(array(
             'wcait_bulk_translate' => 1,
-            'wcait_product_ids' => implode(',', $post_ids)
+            'wcait_count' => count($product_ids)
         ), $redirect_to);
         
         return $redirect_to;
+    }
+    
+    public function show_bulk_translate_notices() {
+        // Show error messages
+        if (isset($_GET['wcait_bulk_error'])) {
+            $error = sanitize_text_field($_GET['wcait_bulk_error']);
+            $message = '';
+            
+            switch ($error) {
+                case 'no_products':
+                    $message = __('No products selected for translation.', 'wc-ai-translator');
+                    break;
+                case 'no_valid_products':
+                    $message = __('No valid products found in selection.', 'wc-ai-translator');
+                    break;
+                case 'no_api_key':
+                    $message = __('API key not configured. Please configure your AI provider settings first.', 'wc-ai-translator');
+                    break;
+            }
+            
+            if ($message) {
+                echo '<div class="notice notice-error is-dismissible"><p>' . esc_html($message) . '</p></div>';
+            }
+        }
+        
+        // Show success message
+        if (isset($_GET['wcait_bulk_success'])) {
+            $success_data = json_decode(stripslashes($_GET['wcait_bulk_success']), true);
+            if ($success_data && is_array($success_data)) {
+                $total = intval($success_data['total']);
+                $success = intval($success_data['success']);
+                $failed = intval($success_data['failed']);
+                
+                $message = sprintf(
+                    __('Bulk translation completed! Success: %d, Failed: %d out of %d total products.', 'wc-ai-translator'),
+                    $success,
+                    $failed,
+                    $total
+                );
+                
+                echo '<div class="notice notice-success is-dismissible"><p>' . esc_html($message) . '</p></div>';
+            }
+        }
     }
     
     public function ajax_translate_title() {
@@ -317,34 +398,84 @@ class WC_AI_Translator {
     public function ajax_bulk_translate() {
         check_ajax_referer('wcait_nonce', 'nonce');
         
-        $product_ids = isset($_POST['product_ids']) ? array_map('intval', $_POST['product_ids']) : array();
-        $results = array();
+        // Get product IDs from session
+        if (!session_id()) {
+            session_start();
+        }
         
-        foreach ($product_ids as $product_id) {
+        $product_ids = isset($_SESSION['wcait_bulk_product_ids']) ? $_SESSION['wcait_bulk_product_ids'] : array();
+        
+        if (empty($product_ids)) {
+            wp_send_json_error(__('No products found for bulk translation', 'wc-ai-translator'));
+        }
+        
+        // Get batch parameters
+        $batch_size = isset($_POST['batch_size']) ? intval($_POST['batch_size']) : 5;
+        $offset = isset($_POST['offset']) ? intval($_POST['offset']) : 0;
+        
+        // Get current batch
+        $current_batch = array_slice($product_ids, $offset, $batch_size);
+        
+        if (empty($current_batch)) {
+            // Clear session data when done
+            unset($_SESSION['wcait_bulk_product_ids']);
+            wp_send_json_success(array(
+                'completed' => true,
+                'message' => __('All translations completed', 'wc-ai-translator')
+            ));
+        }
+        
+        $results = array();
+        $success_count = 0;
+        $error_count = 0;
+        
+        foreach ($current_batch as $product_id) {
             $product = wc_get_product($product_id);
             if ($product) {
                 $original_title = $product->get_name();
                 $translated_title = $this->translate_text($original_title);
                 
-                if ($translated_title) {
+                if ($translated_title && $translated_title !== $original_title) {
                     $product->set_name($translated_title);
                     $product->save();
+                    
                     $results[] = array(
                         'id' => $product_id,
                         'success' => true,
-                        'title' => $translated_title
+                        'original_title' => $original_title,
+                        'translated_title' => $translated_title
                     );
+                    $success_count++;
                 } else {
                     $results[] = array(
                         'id' => $product_id,
                         'success' => false,
-                        'error' => __('Translation failed', 'wc-ai-translator')
+                        'original_title' => $original_title,
+                        'error' => __('Translation failed or no change needed', 'wc-ai-translator')
                     );
+                    $error_count++;
                 }
+            } else {
+                $results[] = array(
+                    'id' => $product_id,
+                    'success' => false,
+                    'error' => __('Product not found', 'wc-ai-translator')
+                );
+                $error_count++;
             }
+            
+            // Small delay to prevent overwhelming the API
+            usleep(100000); // 0.1 second delay
         }
         
-        wp_send_json_success($results);
+        wp_send_json_success(array(
+            'results' => $results,
+            'success_count' => $success_count,
+            'error_count' => $error_count,
+            'processed' => $offset + count($current_batch),
+            'total' => count($product_ids),
+            'has_more' => ($offset + count($current_batch)) < count($product_ids)
+        ));
     }
     
     public function ajax_test_connection() {
@@ -403,7 +534,120 @@ class WC_AI_Translator {
                     )
                 ),
                 'temperature' => 0.3,
-                'max_tokens' => 50
+                'max_tokens' => 100
+            )),
+            'timeout' => 30
+        ));
+        
+        if (is_wp_error($response)) {
+            return false;
+        }
+        
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+        return isset($body['choices'][0]['message']['content']) ? trim($body['choices'][0]['message']['content']) : false;
+    }
+    
+    private function translate_with_claude($prompt, $api_key) {
+        $response = wp_remote_post('https://api.anthropic.com/v1/messages', array(
+            'headers' => array(
+                'x-api-key' => $api_key,
+                'anthropic-version' => '2023-06-01',
+                'Content-Type' => 'application/json',
+            ),
+            'body' => json_encode(array(
+                'model' => 'claude-3-haiku-20240307',
+                'messages' => array(
+                    array(
+                        'role' => 'user',
+                        'content' => $prompt
+                    )
+                ),
+                'max_tokens' => 100
+            )),
+            'timeout' => 30
+        ));
+        
+        if (is_wp_error($response)) {
+            return false;
+        }
+        
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+        return isset($body['content'][0]['text']) ? trim($body['content'][0]['text']) : false;
+    }
+    
+    private function translate_with_gemini($prompt, $api_key) {
+        $response = wp_remote_post('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=' . $api_key, array(
+            'headers' => array(
+                'Content-Type' => 'application/json',
+            ),
+            'body' => json_encode(array(
+                'contents' => array(
+                    array(
+                        'parts' => array(
+                            array(
+                                'text' => $prompt
+                            )
+                        )
+                    )
+                )
+            )),
+            'timeout' => 30
+        ));
+        
+        if (is_wp_error($response)) {
+            return false;
+        }
+        
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+        return isset($body['candidates'][0]['content']['parts'][0]['text']) ? trim($body['candidates'][0]['content']['parts'][0]['text']) : false;
+    }
+    
+    private function translate_with_mesolitica($text, $api_key) {
+        $response = wp_remote_post('https://api.mesolitica.com/translation', array(
+            'headers' => array(
+                'accept' => 'application/json',
+                'Authorization' => 'Bearer ' . $api_key,
+                'Content-Type' => 'application/json',
+            ),
+            'body' => json_encode(array(
+                'input' => $text,
+                'to_lang' => 'ms',
+                'model' => 'base',
+                'temperature' => 0,
+                'top_p' => 1,
+                'top_k' => 1,
+                'repetition_penalty' => 1.1
+            )),
+            'timeout' => 30
+        ));
+        
+        if (is_wp_error($response)) {
+            return false;
+        }
+        
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+        
+        // Mesolitica returns the translation in 'result' field
+        return isset($body['result']) ? trim($body['result']) : false;
+    }
+}
+
+// Initialize the plugin
+add_action('plugins_loaded', function() {
+    if (class_exists('WooCommerce')) {
+        WC_AI_Translator::get_instance();
+    }
+});
+
+// Create assets folder structure on activation
+register_activation_hook(__FILE__, function() {
+    $upload_dir = wp_upload_dir();
+    $plugin_dir = $upload_dir['basedir'] . '/wc-ai-translator';
+    
+    if (!file_exists($plugin_dir)) {
+        wp_mkdir_p($plugin_dir);
+    }
+});tokens' => 50
             )),
             'timeout' => 15
         ));
@@ -568,117 +812,4 @@ class WC_AI_Translator {
                     )
                 ),
                 'temperature' => 0.3,
-                'max_tokens' => 100
-            )),
-            'timeout' => 30
-        ));
-        
-        if (is_wp_error($response)) {
-            return false;
-        }
-        
-        $body = json_decode(wp_remote_retrieve_body($response), true);
-        return isset($body['choices'][0]['message']['content']) ? trim($body['choices'][0]['message']['content']) : false;
-    }
-    
-    private function translate_with_claude($prompt, $api_key) {
-        $response = wp_remote_post('https://api.anthropic.com/v1/messages', array(
-            'headers' => array(
-                'x-api-key' => $api_key,
-                'anthropic-version' => '2023-06-01',
-                'Content-Type' => 'application/json',
-            ),
-            'body' => json_encode(array(
-                'model' => 'claude-3-haiku-20240307',
-                'messages' => array(
-                    array(
-                        'role' => 'user',
-                        'content' => $prompt
-                    )
-                ),
-                'max_tokens' => 100
-            )),
-            'timeout' => 30
-        ));
-        
-        if (is_wp_error($response)) {
-            return false;
-        }
-        
-        $body = json_decode(wp_remote_retrieve_body($response), true);
-        return isset($body['content'][0]['text']) ? trim($body['content'][0]['text']) : false;
-    }
-    
-    private function translate_with_gemini($prompt, $api_key) {
-        $response = wp_remote_post('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=' . $api_key, array(
-            'headers' => array(
-                'Content-Type' => 'application/json',
-            ),
-            'body' => json_encode(array(
-                'contents' => array(
-                    array(
-                        'parts' => array(
-                            array(
-                                'text' => $prompt
-                            )
-                        )
-                    )
-                )
-            )),
-            'timeout' => 30
-        ));
-        
-        if (is_wp_error($response)) {
-            return false;
-        }
-        
-        $body = json_decode(wp_remote_retrieve_body($response), true);
-        return isset($body['candidates'][0]['content']['parts'][0]['text']) ? trim($body['candidates'][0]['content']['parts'][0]['text']) : false;
-    }
-    
-    private function translate_with_mesolitica($text, $api_key) {
-        $response = wp_remote_post('https://api.mesolitica.com/translation', array(
-            'headers' => array(
-                'accept' => 'application/json',
-                'Authorization' => 'Bearer ' . $api_key,
-                'Content-Type' => 'application/json',
-            ),
-            'body' => json_encode(array(
-                'input' => $text,
-                'to_lang' => 'ms',
-                'model' => 'base',
-                'temperature' => 0,
-                'top_p' => 1,
-                'top_k' => 1,
-                'repetition_penalty' => 1.1
-            )),
-            'timeout' => 30
-        ));
-        
-        if (is_wp_error($response)) {
-            return false;
-        }
-        
-        $body = json_decode(wp_remote_retrieve_body($response), true);
-        
-        // Mesolitica returns the translation in 'result' field
-        return isset($body['result']) ? trim($body['result']) : false;
-    }
-}
-
-// Initialize the plugin
-add_action('plugins_loaded', function() {
-    if (class_exists('WooCommerce')) {
-        WC_AI_Translator::get_instance();
-    }
-});
-
-// Create assets folder structure on activation
-register_activation_hook(__FILE__, function() {
-    $upload_dir = wp_upload_dir();
-    $plugin_dir = $upload_dir['basedir'] . '/wc-ai-translator';
-    
-    if (!file_exists($plugin_dir)) {
-        wp_mkdir_p($plugin_dir);
-    }
-});
+                'max_
